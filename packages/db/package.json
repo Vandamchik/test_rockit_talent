@@ -1,0 +1,35 @@
+{
+  "name": "@loan-review/db",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "generate": "prisma generate",
+    "migrate": "prisma migrate deploy",
+    "seed": "tsx prisma/seed.ts",
+    "build": "tsc",
+    "lint": "eslint --config ../config/eslint.config.mjs . --max-warnings=0"
+  },
+  "dependencies": {
+    "@prisma/adapter-pg": "^7.9.1",
+    "@prisma/client": "^7.9.1",
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {
+    "@loan-review/config": "workspace:*",
+    "@types/node": "^24.3.0",
+    "dotenv": "^17.4.2",
+    "eslint": "^9.35.0",
+    "prisma": "^7.9.1",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  }
+}

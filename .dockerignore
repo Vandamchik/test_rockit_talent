@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+.pnpm-store
+.turbo
+**/.turbo
+.next
+**/.next
+dist
+**/dist
+.git
+.env*
+coverage
+package-lock.json

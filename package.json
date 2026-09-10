@@ -1,0 +1,33 @@
+{
+  "name": "loan-decision-workbench",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Senior full-stack take-home exercise for a safe manual loan decision workflow",
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=24.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "scripts": {
+    "dev": "dotenv -e .env -- turbo watch dev",
+    "build": "turbo build",
+    "start": "dotenv -e .env -- turbo start",
+    "lint": "turbo lint",
+    "format": "prettier --config packages/config/prettier.config.mjs --ignore-path packages/config/prettier.ignore --write .",
+    "format:check": "prettier --config packages/config/prettier.config.mjs --ignore-path packages/config/prettier.ignore --check .",
+    "test": "turbo test",
+    "db:generate": "pnpm --filter @loan-review/db generate",
+    "db:migrate": "dotenv -e .env -- pnpm --filter @loan-review/db migrate",
+    "db:seed": "dotenv -e .env -- pnpm --filter @loan-review/db seed"
+  },
+  "devDependencies": {
+    "@loan-review/config": "workspace:*",
+    "@types/node": "^24.3.0",
+    "dotenv-cli": "^8.0.0",
+    "eslint": "^9.35.0",
+    "prettier": "^3.6.2",
+    "turbo": "^2.5.6",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

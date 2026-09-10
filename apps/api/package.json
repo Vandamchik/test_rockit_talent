@@ -1,0 +1,41 @@
+{
+  "name": "@loan-review/api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "types": "./dist/router.d.ts",
+  "exports": {
+    "./router": {
+      "types": "./src/router.ts",
+      "default": "./src/router.ts"
+    },
+    "./types": {
+      "types": "./src/domain.ts",
+      "default": "./src/domain.ts"
+    }
+  },
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "test": "vitest run --config vitest.config.ts",
+    "lint": "eslint --config ../../packages/config/eslint.config.mjs . --max-warnings=0"
+  },
+  "dependencies": {
+    "@fastify/cors": "^11.1.0",
+    "@loan-review/db": "workspace:*",
+    "@trpc/server": "^11.5.1",
+    "fastify": "^5.6.0",
+    "superjson": "^2.2.2",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@loan-review/config": "workspace:*",
+    "@types/node": "^24.3.0",
+    "eslint": "^9.35.0",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2",
+    "vitest": "^3.2.4"
+  }
+}

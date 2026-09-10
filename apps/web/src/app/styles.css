@@ -1,0 +1,279 @@
+:root {
+  color-scheme: light;
+  --ink: #162019;
+  --muted: #647069;
+  --line: #d9e0da;
+  --surface: #f6f8f5;
+  --brand: #1c6b45;
+  --brand-dark: #125134;
+  font-family:
+    Inter,
+    ui-sans-serif,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  background: #eef2ee;
+  color: var(--ink);
+  margin: 0;
+}
+
+button,
+input,
+textarea {
+  font: inherit;
+}
+
+.shell {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: 0 18px 60px rgb(19 46 30 / 8%);
+  margin: 64px auto;
+  max-width: 760px;
+  padding: clamp(28px, 6vw, 56px);
+}
+
+.eyebrow {
+  color: var(--brand);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+h1 {
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  line-height: 1.05;
+  margin: 12px 0 20px;
+}
+
+h2 {
+  font-size: 1.15rem;
+  margin: 30px 0 16px;
+}
+
+.lede,
+.notice {
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1.65;
+}
+
+.title-row {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+}
+
+.status {
+  background: #fff1c9;
+  border-radius: 999px;
+  color: #6f5200;
+  font-size: 0.72rem;
+  font-weight: 800;
+  padding: 8px 11px;
+}
+
+.status-approved {
+  background: #d9f5e5;
+  color: #155d38;
+}
+
+.status-rejected,
+.error {
+  color: #9b2c2c;
+}
+
+.summary-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 4px 22px 18px;
+}
+
+.summary-card dl {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+
+.summary-card dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  margin-bottom: 4px;
+}
+
+.summary-card dd {
+  font-weight: 650;
+  margin: 0;
+}
+
+.decision-form fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+
+.decision-form legend {
+  font-weight: 650;
+  margin-bottom: 10px;
+}
+
+.decision-form label:not(.radio-row) {
+  display: grid;
+  font-weight: 650;
+  gap: 8px;
+  margin: 22px 0;
+}
+
+.radio-row {
+  align-items: center;
+  display: inline-flex;
+  gap: 8px;
+  margin-right: 20px;
+}
+
+.input-affix {
+  align-items: center;
+  border: 1px solid #aab5ad;
+  border-radius: 8px;
+  display: flex;
+  overflow: hidden;
+  padding-left: 12px;
+}
+
+.input-affix input,
+textarea {
+  border: 1px solid #aab5ad;
+  border-radius: 8px;
+  padding: 11px 12px;
+  width: 100%;
+}
+
+.input-affix input {
+  border: 0;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 3px solid #7fcaa4;
+  outline-offset: 2px;
+}
+
+.primary-button,
+.primary-link {
+  background: var(--brand);
+  border: 0;
+  border-radius: 8px;
+  color: white;
+  display: inline-block;
+  font-weight: 700;
+  padding: 12px 18px;
+  text-decoration: none;
+}
+
+.primary-button:hover,
+.primary-link:hover {
+  background: var(--brand-dark);
+}
+
+.primary-button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
+.applications-shell {
+  max-width: 1180px;
+}
+
+.selection-count {
+  color: var(--muted);
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.table-wrap {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  overflow-x: auto;
+}
+
+table {
+  border-collapse: collapse;
+  min-width: 850px;
+  width: 100%;
+}
+
+th,
+td {
+  border-bottom: 1px solid var(--line);
+  padding: 16px;
+  text-align: left;
+}
+
+th {
+  background: var(--surface);
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+tbody tr[data-selected] {
+  background: #edf8f1;
+}
+
+td a {
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.pagination {
+  align-items: center;
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+
+.pagination button {
+  background: white;
+  border: 1px solid #aab5ad;
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 9px 14px;
+}
+
+.pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+@media (max-width: 640px) {
+  .shell {
+    border-radius: 0;
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  .title-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

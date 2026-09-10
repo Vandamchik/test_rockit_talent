@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  UNDERWRITER
+  SUPPORT
+}
+
+enum LoanApplicationStatus {
+  PENDING_REVIEW
+  APPROVED
+  REJECTED
+}
+
+model User {
+  id        String              @id
+  name      String
+  role      UserRole
+  decisions LoanDecisionAudit[]
+  createdAt DateTime            @default(now())
+}
+
+model LoanApplication {
+  id                   String                @id
+  status               LoanApplicationStatus @default(PENDING_REVIEW)
+  requestedAmountMinor Int
+  approvedAmountMinor  Int?
+  customerFullName     String
+  customerLastName     String
+  customerGender       String
+  customerTaxId        String
+  customerEmail        String
+  customerPhone        String
+  customerNationalId   String
+  monthlyIncomeMinor   Int
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  decisions            LoanDecisionAudit[]
+}
+
+model LoanDecisionAudit {
+  id                  String                @id @default(cuid())
+  applicationId       String
+  actorId             String
+  previousStatus      LoanApplicationStatus
+  newStatus           LoanApplicationStatus
+  approvedAmountMinor Int?
+  reason              String
+  createdAt           DateTime              @default(now())
+  application         LoanApplication       @relation(fields: [applicationId], references: [id])
+  actor               User                  @relation(fields: [actorId], references: [id])
+
+  @@index([applicationId])
+}

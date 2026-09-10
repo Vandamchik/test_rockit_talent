@@ -1,0 +1,33 @@
+{
+  "name": "Loan review interview",
+  "dockerComposeFile": "../docker-compose.dev.yaml",
+  "service": "workspace",
+  "runServices": ["postgres", "redis", "workspace"],
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
+  "postCreateCommand": "pnpm install --frozen-lockfile && pnpm db:generate && pnpm db:migrate && pnpm db:seed",
+  "forwardPorts": [3000, 4000, 5432, 6379],
+  "portsAttributes": {
+    "3000": { "label": "Next.js" },
+    "4000": { "label": "Fastify + tRPC" },
+    "5432": { "label": "PostgreSQL", "onAutoForward": "silent" },
+    "6379": { "label": "Redis", "onAutoForward": "silent" }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "Prisma.prisma",
+        "vitest.explorer"
+      ],
+      "settings": {
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "editor.formatOnSave": true,
+        "editor.codeActionsOnSave": {
+          "source.fixAll.eslint": "explicit"
+        }
+      }
+    }
+  }
+}
