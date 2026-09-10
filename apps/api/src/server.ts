@@ -38,14 +38,24 @@ await server.register(fastifyTRPCPlugin, {
           info(context, message) {
             server.log.info(context, message);
           },
+          error(context, message) {
+            server.log.error(context, message);
+          },
         },
       };
     },
   },
 });
 
+const port = Number(process.env.API_PORT ?? 4000);
+
+if (!Number.isInteger(port) || port <= 0) {
+  server.log.error({ configuredPort: process.env.API_PORT }, "API_PORT is not a valid port number");
+  process.exit(1);
+}
+
 try {
-  await server.listen({ port: 4000, host: "0.0.0.0" });
+  await server.listen({ port, host: "0.0.0.0" });
 } catch (error: unknown) {
   server.log.error(error);
   process.exit(1);

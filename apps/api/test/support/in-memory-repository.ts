@@ -72,11 +72,39 @@ export class InMemoryLoanRepository implements LoanRepository {
 }
 
 export class CapturingLogger implements AppLogger {
-  events: Array<{ context: Record<string, unknown>; message: string }> = [];
+  events: Array<{ level: "info" | "error"; context: Record<string, unknown>; message: string }> = [];
 
   info(context: Record<string, unknown>, message: string): void {
-    this.events.push({ context: clone(context), message });
+    this.events.push({ level: "info", context: safeClone(context), message });
   }
+
+  error(context: Record<string, unknown>, message: string): void {
+    this.events.push({ level: "error", context: safeClone(context), message });
+  }
+}
+
+/**
+ * `structuredClone` throws on values it cannot serialise, and error contexts routinely
+ * carry an `Error`. Fall back to a shallow copy with errors reduced to their message so
+ * that logging can never be the reason a test fails.
+ */
+function safeClone(context: Record<string, unknown>): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(context)) {
+    if (value instanceof Error) {
+      result[key] = { name: value.name, message: value.message };
+      continue;
+    }
+
+    try {
+      result[key] = structuredClone(value);
+    } catch {
+      result[key] = String(value);
+    }
+  }
+
+  return result;
 }
 
 export const underwriter: SessionUser = {

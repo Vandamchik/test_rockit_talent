@@ -19,8 +19,8 @@ const protectedProcedure = t.procedure.use(async ({ ctx, next }) => {
 });
 
 export const underwriterProcedure = protectedProcedure.use(async ({ ctx, next }) => {
-  if (!ctx.session.user.role) {
-    throw new TRPCError({ code: "FORBIDDEN" });
+  if (ctx.session.user.role !== "UNDERWRITER") {
+    throw new TRPCError({ code: "FORBIDDEN", message: "Only underwriters may record decisions" });
   }
   return next({ ctx });
 });
@@ -55,7 +55,7 @@ export const appRouter = t.router({
       return applications.map(toView);
     }),
 
-    delete: t.procedure
+    delete: underwriterProcedure
       .input(z.object({ applicationId: z.string().min(1) }))
       .mutation(async ({ ctx, input }) => {
         const application = await ctx.repository.deleteApplication(input.applicationId);
@@ -80,9 +80,13 @@ export const appRouter = t.router({
           if (!application) {
             throw new TRPCError({ code: "NOT_FOUND", message: "Application not found" });
           }
-
           ctx.logger.info(
-            { input, application, user: ctx.session.user },
+            {
+              applicationId: application.id,
+              actorId: ctx.session.user.id,
+              currentStatus: application.status,
+              decision: input.decision,
+            },
             "Processing loan decision",
           );
 
@@ -114,7 +118,16 @@ export const appRouter = t.router({
           };
 
           return response;
-        } catch {
+        } catch (error: unknown) {
+          if (error instanceof TRPCError) {
+            throw error;
+          }
+
+          ctx.logger.error(
+            { applicationId: input.applicationId, actorId: ctx.session.user.id, error },
+            "Unexpected failure while recording a loan decision",
+          );
+
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
             message: "Decision failed",
