@@ -1,14 +1,12 @@
-import {
-  LoanApplicationStatus as PrismaLoanApplicationStatus,
-  type PrismaClient,
-} from "@loan-review/db";
+import type { LoanApplicationStatus as PrismaLoanApplicationStatus } from "@loan-review/db";
+import { type PrismaClient } from "@loan-review/db";
 
 import type {
-  AuditRecordInput,
   LoanApplicationRecord,
   LoanApplicationStatus,
-  LoanDecision,
   LoanRepository,
+  RecordDecisionInput,
+  RecordDecisionResult,
 } from "./domain.js";
 
 function toRecord(application: {
@@ -16,6 +14,7 @@ function toRecord(application: {
   status: PrismaLoanApplicationStatus;
   requestedAmountMinor: number;
   approvedAmountMinor: number | null;
+  proposedByUserId: string | null;
   customerFullName: string;
   customerLastName: string;
   customerGender: string;
@@ -30,6 +29,7 @@ function toRecord(application: {
     status: application.status as LoanApplicationStatus,
     requestedAmountMinor: application.requestedAmountMinor,
     approvedAmountMinor: application.approvedAmountMinor,
+    proposedByUserId: application.proposedByUserId,
     customer: {
       fullName: application.customerFullName,
       lastName: application.customerLastName,
@@ -63,34 +63,52 @@ export class PrismaLoanRepository implements LoanRepository {
     return toRecord(application);
   }
 
-  async updateApplication(
-    id: string,
-    decision: LoanDecision,
-    approvedAmountMinor: number | null,
-  ): Promise<LoanApplicationRecord> {
-    const application = await this.client.loanApplication.update({
-      where: { id },
-      data: {
-        status:
-          decision === "APPROVED"
-            ? PrismaLoanApplicationStatus.APPROVED
-            : PrismaLoanApplicationStatus.REJECTED,
-        approvedAmountMinor,
-      },
-    });
-    return toRecord(application);
-  }
+  async recordDecision(input: RecordDecisionInput): Promise<RecordDecisionResult> {
+    return this.client.$transaction(async (tx) => {
+      const existing = await tx.loanApplication.findUnique({
+        where: { id: input.applicationId },
+        select: { status: true },
+      });
 
-  async createAudit(input: AuditRecordInput): Promise<void> {
-    await this.client.loanDecisionAudit.create({
-      data: {
-        applicationId: input.applicationId,
-        actorId: input.actorId,
-        previousStatus: input.previousStatus as PrismaLoanApplicationStatus,
-        newStatus: input.newStatus as PrismaLoanApplicationStatus,
-        approvedAmountMinor: input.approvedAmountMinor,
-        reason: input.reason,
-      },
+      if (!existing) {
+        return { outcome: "conflict" };
+      }
+
+      const updated = await tx.loanApplication.updateMany({
+        where: {
+          id: input.applicationId,
+          status: {
+            in: input.expectedStatuses as PrismaLoanApplicationStatus[],
+          },
+          ...(input.rejectActorAsProposer ? { proposedByUserId: { not: input.actorId } } : {}),
+        },
+        data: {
+          status: input.nextStatus as PrismaLoanApplicationStatus,
+          approvedAmountMinor: input.approvedAmountMinor,
+          proposedByUserId: input.proposedByUserId,
+        },
+      });
+
+      if (updated.count === 0) {
+        return { outcome: "conflict" };
+      }
+
+      await tx.loanDecisionAudit.create({
+        data: {
+          applicationId: input.applicationId,
+          actorId: input.actorId,
+          previousStatus: existing.status,
+          newStatus: input.nextStatus as PrismaLoanApplicationStatus,
+          approvedAmountMinor: input.approvedAmountMinor,
+          reason: input.reason,
+        },
+      });
+
+      const application = await tx.loanApplication.findUniqueOrThrow({
+        where: { id: input.applicationId },
+      });
+
+      return { outcome: "applied", application: toRecord(application) };
     });
   }
 }

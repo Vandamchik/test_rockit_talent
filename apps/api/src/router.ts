@@ -2,12 +2,15 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import { z } from "zod";
 
-import type {
-  DecideLoanApplicationInput,
-  LoanApplicationRecord,
-  LoanApplicationView,
-  RequestContext,
+import {
+  HIGH_VALUE_THRESHOLD_MINOR,
+  type LoanApplicationRecord,
+  type LoanApplicationStatus,
+  type LoanApplicationView,
+  type RecordDecisionInput,
+  type RequestContext,
 } from "./domain.js";
+import type { LoanNotificationType } from "./notifier.js";
 
 const t = initTRPC.context<RequestContext>().create({ transformer: superjson });
 
@@ -25,12 +28,26 @@ export const underwriterProcedure = protectedProcedure.use(async ({ ctx, next })
   return next({ ctx });
 });
 
-export const decideLoanApplicationSchema = z.object({
-  applicationId: z.string().min(1),
-  decision: z.enum(["APPROVED", "REJECTED"]),
-  approvedAmountMinor: z.number().optional(),
-  reason: z.string().min(1),
-});
+export const decideLoanApplicationSchema = z.discriminatedUnion("decision", [
+  z.object({
+    applicationId: z.string().min(1),
+    decision: z.literal("APPROVED"),
+    approvedAmountMinor: z.number().int().positive(),
+    reason: z.string().trim().min(1),
+  }),
+  z.object({
+    applicationId: z.string().min(1),
+    decision: z.literal("REJECTED"),
+    reason: z.string().trim().min(1),
+  }),
+  z.object({
+    applicationId: z.string().min(1),
+    decision: z.literal("CONFIRMED"),
+    reason: z.string().trim().min(1),
+  }),
+]);
+
+type DecideInput = z.infer<typeof decideLoanApplicationSchema>;
 
 function toView(application: LoanApplicationRecord): LoanApplicationView {
   return {
@@ -38,6 +55,7 @@ function toView(application: LoanApplicationRecord): LoanApplicationView {
     status: application.status,
     requestedAmountMinor: application.requestedAmountMinor,
     approvedAmountMinor: application.approvedAmountMinor,
+    proposedByUserId: application.proposedByUserId,
     customer: {
       fullName: application.customer.fullName,
       lastName: application.customer.lastName,
@@ -45,6 +63,62 @@ function toView(application: LoanApplicationRecord): LoanApplicationView {
       taxId: application.customer.taxId,
       email: application.customer.email,
     },
+  };
+}
+
+const NOTIFICATION_BY_STATUS: Partial<Record<LoanApplicationStatus, LoanNotificationType>> = {
+  PENDING_CONFIRMATION: "APPROVAL_PROPOSED",
+  APPROVED: "APPROVED",
+  REJECTED: "REJECTED",
+};
+
+function planTransition(
+  application: LoanApplicationRecord,
+  input: DecideInput,
+  actorId: string,
+): Omit<RecordDecisionInput, "applicationId" | "actorId" | "reason"> {
+  if (input.decision === "REJECTED") {
+    return {
+      expectedStatuses: ["PENDING_REVIEW", "PENDING_CONFIRMATION"],
+      nextStatus: "REJECTED",
+      approvedAmountMinor: null,
+      proposedByUserId: null,
+      rejectActorAsProposer: false,
+    };
+  }
+
+  if (input.decision === "CONFIRMED") {
+    if (application.approvedAmountMinor === null) {
+      throw new TRPCError({
+        code: "CONFLICT",
+        message: "This application is not awaiting confirmation",
+      });
+    }
+
+    return {
+      expectedStatuses: ["PENDING_CONFIRMATION"],
+      nextStatus: "APPROVED",
+      approvedAmountMinor: application.approvedAmountMinor,
+      proposedByUserId: application.proposedByUserId,
+      rejectActorAsProposer: true,
+    };
+  }
+
+  if (input.approvedAmountMinor > application.requestedAmountMinor) {
+    throw new TRPCError({
+      code: "BAD_REQUEST",
+      message: "The approved amount cannot exceed the requested amount",
+    });
+  }
+
+  const isHighValue = input.approvedAmountMinor > HIGH_VALUE_THRESHOLD_MINOR;
+
+  return {
+    expectedStatuses: ["PENDING_REVIEW"],
+    nextStatus: isHighValue ? "PENDING_CONFIRMATION" : "APPROVED",
+    approvedAmountMinor: input.approvedAmountMinor,
+    proposedByUserId: isHighValue ? actorId : null,
+    rejectActorAsProposer: false,
   };
 }
 
@@ -75,6 +149,8 @@ export const appRouter = t.router({
     decide: underwriterProcedure
       .input(decideLoanApplicationSchema)
       .mutation(async ({ ctx, input }) => {
+        const actorId = ctx.session.user.id;
+
         try {
           const application = await ctx.repository.findApplication(input.applicationId);
           if (!application) {
@@ -83,79 +159,61 @@ export const appRouter = t.router({
           ctx.logger.info(
             {
               applicationId: application.id,
-              actorId: ctx.session.user.id,
+              actorId,
               currentStatus: application.status,
               decision: input.decision,
             },
             "Processing loan decision",
           );
 
-          if (application.status !== "PENDING_REVIEW") {
-            throw new TRPCError({ code: "CONFLICT", message: "Application already decided" });
-          }
+          const plan = planTransition(application, input, actorId);
 
-          validateBusinessRules(application, input);
-
-          const updated = await ctx.repository.updateApplication(
-            application.id,
-            input.decision,
-            input.approvedAmountMinor ?? null,
-          );
-
-          await ctx.repository.createAudit({
+          const result = await ctx.repository.recordDecision({
+            ...plan,
             applicationId: application.id,
-            actorId: ctx.session.user.id,
-            previousStatus: application.status,
-            newStatus: input.decision,
-            approvedAmountMinor: input.approvedAmountMinor ?? null,
+            actorId,
             reason: input.reason,
           });
 
-          const response = {
-            applicationId: updated.id,
-            status: input.decision,
-            approvedAmountMinor: updated.approvedAmountMinor,
-          };
+          if (result.outcome === "conflict") {
+            throw new TRPCError({
+              code: "CONFLICT",
+              message: "This decision is not available for the application's current state",
+            });
+          }
 
-          return response;
+          const decided = result.application;
+          const notification = NOTIFICATION_BY_STATUS[decided.status];
+          if (notification) {
+            try {
+              await ctx.notifier.send({ applicationId: decided.id, type: notification });
+            } catch (error: unknown) {
+              ctx.logger.error(
+                { applicationId: decided.id, notification, error },
+                "Loan decision was recorded but its notification could not be delivered",
+              );
+            }
+          }
+
+          return {
+            applicationId: decided.id,
+            status: decided.status,
+            approvedAmountMinor: decided.approvedAmountMinor,
+          };
         } catch (error: unknown) {
           if (error instanceof TRPCError) {
             throw error;
           }
 
           ctx.logger.error(
-            { applicationId: input.applicationId, actorId: ctx.session.user.id, error },
+            { applicationId: input.applicationId, actorId, error },
             "Unexpected failure while recording a loan decision",
           );
 
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Decision failed",
-          });
+          throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Decision failed" });
         }
       }),
   }),
 });
-
-function validateBusinessRules(
-  application: LoanApplicationRecord,
-  input: DecideLoanApplicationInput,
-): void {
-  if (!input.reason.trim()) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "A reason is required" });
-  }
-
-  if (input.decision === "APPROVED") {
-    if (
-      input.approvedAmountMinor === undefined ||
-      !Number.isInteger(input.approvedAmountMinor) ||
-      input.approvedAmountMinor > application.requestedAmountMinor
-    ) {
-      throw new TRPCError({ code: "BAD_REQUEST", message: "Invalid approved amount" });
-    }
-  } else if (input.approvedAmountMinor !== undefined) {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Rejection cannot have an amount" });
-  }
-}
 
 export type AppRouter = typeof appRouter;

@@ -22,7 +22,7 @@ state. Everything else is under "Non-critical improvements".
 
 3. **A blanket `catch` converts every error into `INTERNAL_SERVER_ERROR`.**
    The `decide` handler wraps its whole body in `try { ... } catch { throw new TRPCError({
-   code: "INTERNAL_SERVER_ERROR" }) }`. The deliberate `NOT_FOUND`, `CONFLICT` and
+code: "INTERNAL_SERVER_ERROR" }) }`. The deliberate `NOT_FOUND`, `CONFLICT` and
    `BAD_REQUEST` errors raised inside that block are swallowed and rewritten, so a client can
    never distinguish "application not found" from "already decided" from "invalid amount".
    This directly contradicts the requirement to return useful, consistent errors, and it also
@@ -148,8 +148,8 @@ state. Everything else is under "Non-critical improvements".
    - A second migration for `proposedByUserId` (nullable, FK to `User`), the widening of the
      money columns to `BIGINT`, an `AFTER`-insert-only trigger rejecting `UPDATE`/`DELETE` on
      `LoanDecisionAudit`, and the supporting indexes.
-   Both are additive and leave existing rows valid; no existing `APPROVED` row acquires the
-   new status, so final decisions are not reinterpreted.
+     Both are additive and leave existing rows valid; no existing `APPROVED` row acquires the
+     new status, so final decisions are not reinterpreted.
 4. Rewrite `decide` around the state machine. Model the input as a discriminated union
    (`APPROVE` carries an amount, `REJECT` and `CONFIRM` do not) so that "rejection carries no
    amount" is unrepresentable rather than validated. Perform the status change, the audit

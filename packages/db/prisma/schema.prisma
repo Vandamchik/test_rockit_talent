@@ -14,16 +14,18 @@ enum UserRole {
 
 enum LoanApplicationStatus {
   PENDING_REVIEW
+  PENDING_CONFIRMATION
   APPROVED
   REJECTED
 }
 
 model User {
-  id        String              @id
-  name      String
-  role      UserRole
-  decisions LoanDecisionAudit[]
-  createdAt DateTime            @default(now())
+  id            String              @id
+  name          String
+  role          UserRole
+  decisions     LoanDecisionAudit[]
+  proposals     LoanApplication[]   @relation("ProposedBy")
+  createdAt     DateTime            @default(now())
 }
 
 model LoanApplication {
@@ -31,6 +33,7 @@ model LoanApplication {
   status               LoanApplicationStatus @default(PENDING_REVIEW)
   requestedAmountMinor Int
   approvedAmountMinor  Int?
+  proposedByUserId     String?
   customerFullName     String
   customerLastName     String
   customerGender       String
@@ -42,6 +45,10 @@ model LoanApplication {
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
   decisions            LoanDecisionAudit[]
+  proposedBy           User?                 @relation("ProposedBy", fields: [proposedByUserId], references: [id])
+
+  @@index([status])
+  @@index([proposedByUserId])
 }
 
 model LoanDecisionAudit {
@@ -57,4 +64,5 @@ model LoanDecisionAudit {
   actor               User                  @relation(fields: [actorId], references: [id])
 
   @@index([applicationId])
+  @@index([applicationId, createdAt])
 }

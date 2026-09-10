@@ -1,6 +1,13 @@
+import type { LoanNotifier } from "./notifier.js";
+
 export type UserRole = "UNDERWRITER" | "SUPPORT";
-export type LoanApplicationStatus = "PENDING_REVIEW" | "APPROVED" | "REJECTED";
-export type LoanDecision = "APPROVED" | "REJECTED";
+
+export type LoanApplicationStatus =
+  "PENDING_REVIEW" | "PENDING_CONFIRMATION" | "APPROVED" | "REJECTED";
+
+export type LoanDecision = "APPROVED" | "REJECTED" | "CONFIRMED";
+
+export const HIGH_VALUE_THRESHOLD_MINOR = 1_000_000;
 
 export interface SessionUser {
   id: string;
@@ -13,6 +20,7 @@ export interface LoanApplicationRecord {
   status: LoanApplicationStatus;
   requestedAmountMinor: number;
   approvedAmountMinor: number | null;
+  proposedByUserId: string | null;
   customer: {
     fullName: string;
     lastName: string;
@@ -30,6 +38,7 @@ export interface LoanApplicationView {
   status: LoanApplicationStatus;
   requestedAmountMinor: number;
   approvedAmountMinor: number | null;
+  proposedByUserId: string | null;
   customer: {
     fullName: string;
     lastName: string;
@@ -50,21 +59,30 @@ export interface AuditRecordInput {
   applicationId: string;
   actorId: string;
   previousStatus: LoanApplicationStatus;
-  newStatus: LoanDecision;
+  newStatus: LoanApplicationStatus;
   approvedAmountMinor: number | null;
   reason: string;
 }
+
+export interface RecordDecisionInput {
+  applicationId: string;
+  actorId: string;
+  expectedStatuses: LoanApplicationStatus[];
+  nextStatus: LoanApplicationStatus;
+  approvedAmountMinor: number | null;
+  proposedByUserId: string | null;
+  rejectActorAsProposer: boolean;
+  reason: string;
+}
+
+export type RecordDecisionResult =
+  { outcome: "applied"; application: LoanApplicationRecord } | { outcome: "conflict" };
 
 export interface LoanRepository {
   findApplication(id: string): Promise<LoanApplicationRecord | null>;
   listApplications(): Promise<LoanApplicationRecord[]>;
   deleteApplication(id: string): Promise<LoanApplicationRecord>;
-  updateApplication(
-    id: string,
-    decision: LoanDecision,
-    approvedAmountMinor: number | null,
-  ): Promise<LoanApplicationRecord>;
-  createAudit(input: AuditRecordInput): Promise<void>;
+  recordDecision(input: RecordDecisionInput): Promise<RecordDecisionResult>;
 }
 
 export interface AppLogger {
@@ -76,4 +94,5 @@ export interface RequestContext {
   repository: LoanRepository;
   session: { user: SessionUser } | null;
   logger: AppLogger;
+  notifier: LoanNotifier;
 }

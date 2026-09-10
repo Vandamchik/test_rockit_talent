@@ -5,11 +5,21 @@ import type { CreateFastifyContextOptions } from "@trpc/server/adapters/fastify"
 import Fastify from "fastify";
 
 import type { RequestContext, UserRole } from "./domain.js";
+import type { LoanNotification, LoanNotifier } from "./notifier.js";
 import { PrismaLoanRepository } from "./repository.js";
 import { appRouter } from "./router.js";
 
 const server = Fastify({ logger: true, routerOptions: { maxParamLength: 5_000 } });
 const repository = new PrismaLoanRepository(prisma);
+
+const notifier: LoanNotifier = {
+  async send(notification: LoanNotification): Promise<void> {
+    server.log.info(
+      { applicationId: notification.applicationId, type: notification.type },
+      "Loan notification dispatched",
+    );
+  },
+};
 
 await server.register(cors, {
   origin: process.env.WEB_ORIGIN ?? "http://localhost:3000",
@@ -27,6 +37,7 @@ await server.register(fastifyTRPCPlugin, {
       const role: UserRole = roleHeader === "SUPPORT" ? "SUPPORT" : "UNDERWRITER";
       return {
         repository,
+        notifier,
         session: {
           user: {
             id: req.headers["x-user-id"]?.toString() ?? "user-underwriter-1",
